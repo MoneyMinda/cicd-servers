@@ -1,4 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
+
 Description: >
   Stack template for creating networking resources for a project.
 
@@ -81,7 +82,7 @@ Resources:
   DeJenkinsPublicRouteInternetIpv6:
     Type: AWS::EC2::Route
     Properties:
-      DestinationCidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv6, block]
+      DestinationIpv6CidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv6, block]
       GatewayId:
         Ref: DeJenkinsInternetGateway
       RouteTableId:
@@ -135,7 +136,7 @@ Resources:
   DeJenkinsSecurityGroupEgressIpv4:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
-      GroupName:
+      GroupId:
         Ref: DeJenkinsSecurityGroup
       CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv4, block ]
       Description: "All outgoing Ipv4"
@@ -146,9 +147,9 @@ Resources:
   DeJenkinsSecurityGroupEgressIpv6:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
-      GroupName:
+      GroupId:
         Ref: DeJenkinsSecurityGroup
-      CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
+      CidrIpv6: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
       Description: "All outgoing Ipv6"
       FromPort: 0
       ToPort: 65535
