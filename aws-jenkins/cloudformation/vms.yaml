@@ -96,6 +96,7 @@ Resources:
       LaunchTemplateData:
         KeyName: !Ref SshKey
         InstanceType: !FindInMap [InstanceTypes, !Ref EnvParam, instanceType]
+        ImageId: "ami-02f3f602d23f1659d"
         IamInstanceProfile:
           Name: !Ref InstanceProfile
           Arn: !GetAtt [InstanceProfile, Arn]
@@ -142,10 +143,16 @@ Resources:
             sudo systemctl start jenkins
             sudo systemctl status jenkins
 
-
-#  Ec2Instance:
-#    Type: AWS::EC2::Instance
-#    Properties:
-#      ImageId: ''
-#      KeyName: !Ref SshKey
-#
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+         LaunchTemplateId: !Ref LaunchTemplate
+         Version: !GetAtt [LaunchTemplate, LatestVersionNumber]
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-ec2-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
