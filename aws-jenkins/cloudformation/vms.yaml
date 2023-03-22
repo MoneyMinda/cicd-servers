@@ -98,12 +98,10 @@ Resources:
         InstanceType: !FindInMap [InstanceTypes, !Ref EnvParam, instanceType]
         ImageId: "ami-02f3f602d23f1659d"
         IamInstanceProfile:
-          Name: !Ref InstanceProfile
           Arn: !GetAtt [InstanceProfile, Arn]
         Monitoring:
           Enabled: true
         PrivateDnsNameOptions:
-          EnableResourceNameDnsAAAARecord: true
           EnableResourceNameDnsARecord: true
           HostnameType: "resource-name"
         Placement:
@@ -116,6 +114,7 @@ Resources:
           - Description: "VM ENI"
             DeleteOnTermination: true
             AssociatePublicIpAddress: true
+            DeviceIndex: 0
             Groups:
               - Fn::GetAtt:
                   - NetworkingComponents
