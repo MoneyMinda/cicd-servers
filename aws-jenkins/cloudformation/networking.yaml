@@ -11,13 +11,32 @@ Mappings:
       "block": "::/0"
     VpcBlock:
       "block": "10.0.0.0/16"
-    PublicSubnetBlock1:
-      "block": "10.0.1.0/20"
-    PrivateSubnetBlock1:
-      "block": "10.0.2.0/20"
+    PublicBlock1:
+      "block": "10.0.0.0/24"
+    PrivateBlock1:
+      "block": "10.0.1.0/24"
+    PublicBlock2:
+      "block": "10.0.2.0/24"
+    PrivateBlock2:
+      "block": "10.0.3.0/24"
+
+Parameters:
+  ProjectNameParam:
+    Type: String
+    Description: Enter value for project name tag
+    Default: "network"
+  EnvParam:
+    Type: String
+    Description: Enter value for environment tag
+    Default: "dev"
+    AllowedValues:
+      - "prod"
+      - "dev"
+      - "qa"
+      - "test"
 
 Resources:
-  DeJenkinsVpc:
+  Vpc:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: !FindInMap [CidrBlockMap, VpcBlock, block]
@@ -25,132 +44,240 @@ Resources:
       EnableDnsSupport: true
       Tags:
         - Key: Name
-          Value: "de-etl-vpc"
+          Value: !Sub "${ProjectNameParam}-vpc-${EnvParam}"
         - Key: project
-          Value: "de-etl-prj-jenkins"
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
 
-  DeJenkinsInternetGateway:
+  InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: "de-etl-igw"
+          Value: !Sub "${ProjectNameParam}-igw-${EnvParam}"
         - Key: project
-          Value: "de-etl-prj-jenkins"
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
 
-  DeJenkinsVpcInternetGatewayAttachment:
+  VpcInternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       InternetGatewayId:
-        Ref: DeJenkinsInternetGateway
+        Ref: InternetGateway
       VpcId:
-        Ref: DeJenkinsVpc
+        Ref: Vpc
 
-  DeJenkinsPublicSubnet1:
+  PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: "us-east-1a"
-      CidrBlock: !FindInMap [CidrBlockMap, PublicSubnetBlock1, block]
-      VpcId: !Ref DeJenkinsVpc
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !FindInMap [CidrBlockMap, PublicBlock1, block]
+      VpcId: !Ref Vpc
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: "de-etl-subnet-public-1a"
+          Value: !Sub "${ProjectNameParam}-public1-${EnvParam}"
         - Key: project
-          Value: "de-etl-prj-jenkins"
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
 
-  DeJenkinsPublicRouteTable1:
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !FindInMap [CidrBlockMap, PrivateBlock1, block]
+      VpcId: !Ref Vpc
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-private1-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !FindInMap [CidrBlockMap, PublicBlock2, block]
+      VpcId: !Ref Vpc
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-public2-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !FindInMap [CidrBlockMap, PrivateBlock2, block]
+      VpcId: !Ref Vpc
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-private2-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  PublicRouteTable1:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId:
-        Ref: DeJenkinsVpc
+        Ref: Vpc
       Tags:
         - Key: Name
-          Value: "de-etl-rtb-public-1a"
+          Value: !Sub "${ProjectNameParam}-rtb-public-${EnvParam}"
         - Key: project
-          Value: "de-etl-prj-jenkins"
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
 
-  DeJenkinsPublicRouteInternetIpv4:
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-rtb-private-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  PublicRouteInternetIpv4:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv4, block]
       GatewayId:
-        Ref: DeJenkinsInternetGateway
+        Ref: InternetGateway
       RouteTableId:
-         Ref: DeJenkinsPublicRouteTable1
+         Ref: PublicRouteTable1
 
-  DeJenkinsPublicRouteInternetIpv6:
+  PublicRouteInternetIpv6:
     Type: AWS::EC2::Route
     Properties:
       DestinationIpv6CidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv6, block]
       GatewayId:
-        Ref: DeJenkinsInternetGateway
+        Ref: InternetGateway
       RouteTableId:
-         Ref: DeJenkinsPublicRouteTable1
+         Ref: PublicRouteTable1
 
-  DeJenkinsPublic1RouteTableAssociation:
+  Public1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId:
-        Ref: DeJenkinsPublicRouteTable1
+        Ref: PublicRouteTable1
       SubnetId:
-        Ref: DeJenkinsPublicSubnet1
+        Ref: PublicSubnet1
 
-  DeJenkinsSecurityGroup:
+  Public2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable1
+      SubnetId:
+        Ref: PublicSubnet2
+
+  Private1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      SubnetId:
+        Ref: PrivateSubnet1
+
+  Private2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      SubnetId:
+        Ref: PrivateSubnet2
+
+  SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Jenkins server host
-      GroupName: "de-etl-ec2-sg"
+      GroupDescription: Sg for server host
+      GroupName: !Sub "${ProjectNameParam}-ec2-sg-${EnvParam}"
       VpcId:
-        Ref: DeJenkinsVpc
+        Ref: Vpc
+      SecurityGroupIngress:
+        CidrIp: !FindInMap [ CidrBlockMap, PublicBlock1, block ]
+        Description: "public1"
+        FromPort: 0
+        ToPort: 65535
+        IpProtocol: tcp
+      SecurityGroupEgress:
+          - CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv4, block ]
+            Description: "All Ipv4"
+            FromPort: 0
+            ToPort: 65535
+            IpProtocol: tcp
+          - CidrIpv6: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
+            Description: "All Ipv6"
+            FromPort: 0
+            ToPort: 65535
+            IpProtocol: tcp
       Tags:
         - Key: Name
-          Value: "de-etl-ec2-sg"
+          Value: !Sub "${ProjectNameParam}-ec2-sg-${EnvParam}"
         - Key: project
-          Value: "de-etl-prj-jenkins"
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
 
-  DeJenkinsSecurityGroupIngressSubnet:
+  SecurityGroupIngressSelfRef:
     Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupName:
-        Ref: DeJenkinsSecurityGroup
-      CidrIp: !FindInMap [CidrBlockMap, PublicSubnetBlock1, block]
-      Description: "public-subnet-1a"
-      FromPort: 0
-      ToPort: 65535
-      IpProtocol: tcp
-
-  DeJenkinsSecurityGroupIngressSelfRef:
-    Type: AWS::EC2::SecurityGroupIngress
-    DependsOn: DeJenkinsSecurityGroup
-    Properties:
-      GroupName:
-        Ref: DeJenkinsSecurityGroup
-      SourceSecurityGroupName:
-        Ref: DeJenkinsSecurityGroup
-      Description: "self reference rule"
-      FromPort: 0
-      ToPort: 65535
-      IpProtocol: tcp
-
-  DeJenkinsSecurityGroupEgressIpv4:
-    Type: AWS::EC2::SecurityGroupEgress
+    DependsOn: SecurityGroup
     Properties:
       GroupId:
-        Ref: DeJenkinsSecurityGroup
-      CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv4, block ]
-      Description: "All outgoing Ipv4"
+        Ref: SecurityGroup
+      SourceSecurityGroupId:
+        Ref: SecurityGroup
+      Description: "self reference"
       FromPort: 0
       ToPort: 65535
       IpProtocol: tcp
 
-  DeJenkinsSecurityGroupEgressIpv6:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId:
-        Ref: DeJenkinsSecurityGroup
-      CidrIpv6: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
-      Description: "All outgoing Ipv6"
-      FromPort: 0
-      ToPort: 65535
-      IpProtocol: tcp
+Outputs:
+  Vpc:
+    Description: Id of the VPC created in this stack
+    Value: !Ref Vpc
+  PublicSubnet1Id:
+    Description: Id of the 1st public subnet created in this stack
+    Value: !Ref PublicSubnet1
+  PublicSubnet1Az:
+    Description: Az of the 1st public subnet created in this stack
+    Value: !GetAtt [PublicSubnet1, AvailabilityZone]
+  PrivateSubnet1Id:
+    Description: Id of the 1st private subnet created in this stack
+    Value: !Ref PrivateSubnet1
+  PrivateSubnet1Az:
+    Description: Az of the 1st private subnet created in this stack
+    Value: !GetAtt [PrivateSubnet1, AvailabilityZone]
+  SecurityGroupId:
+    Description: Id of the security group created in this stack
+    Value: !Ref SecurityGroup

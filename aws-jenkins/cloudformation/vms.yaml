@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  Stack template for creating a single virtual machine host
+
+Parameters:
+  ProjectNameParam:
+    Type: String
+    Description: Enter value for project name tag
+    Default: "network"
+  EnvParam:
+    Type: String
+    Description: Enter value for environment tag
+    Default: "dev"
+    AllowedValues:
+      - "prod"
+      - "dev"
+      - "qa"
+      - "test"
+  CfBucketParam:
+    Type: String
+    Description: Enter value for bucket where nested scripts are found
+  NetworkStackS3FileKeyParam:
+    Type: String
+    Description: Enter s3 key of file for networking stack
+    Default: "cloudformation/networking.yaml"
+
+Mappings:
+  InstanceTypes:
+    dev:
+      "instanceType": "t3.small"
+    test:
+      "instanceType": "t4g.xlarge"
+    prod:
+      "instanceType": "t4g.2xlarge"
+
+Resources:
+  NetworkingComponents:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${CfBucketParam}.s3.amazonaws.com/${NetworkStackS3FileKeyParam}"
+      Parameters:
+        ProjectNameParam: !Ref ProjectNameParam
+        EnvParam: !Ref EnvParam
+
+  SshKey:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${ProjectNameParam}-vm-sshkey-${EnvParam}"
+      KeyType: "ed25519"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-vm-sshkey-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectNameParam}-ec2-role-${EnvParam}"
+      Path: "/developer/"
+      PermissionsBoundary: !Sub "arn:aws:iam::${AWS::AccountId}:policy/DeveloperPermissionBoundaryPolicy"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: JenkinsPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    DependsOn: InstanceRole
+    Properties:
+      InstanceProfileName: !Sub "${ProjectNameParam}-ec2-ip-${EnvParam}"
+      Path: "/developer/"
+      Roles:
+        - !Ref InstanceRole
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${ProjectNameParam}-launch-template-${EnvParam}"
+      LaunchTemplateData:
+        KeyName: !Ref SshKey
+        InstanceType: !FindInMap [InstanceTypes, !Ref EnvParam, instanceType]
+        IamInstanceProfile:
+          Name: !Ref InstanceProfile
+          Arn: !GetAtt [InstanceProfile, Arn]
+        Monitoring:
+          Enabled: true
+        PrivateDnsNameOptions:
+          EnableResourceNameDnsAAAARecord: true
+          EnableResourceNameDnsARecord: true
+          HostnameType: "resource-name"
+        Placement:
+          Tenancy: default
+          AvailabilityZone:
+            Fn::GetAtt:
+              - NetworkingComponents
+              - Outputs.PublicSubnet1Az
+        NetworkInterfaces:
+          - Description: "VM ENI"
+            DeleteOnTermination: true
+            AssociatePublicIpAddress: true
+            Groups:
+              - Fn::GetAtt:
+                  - NetworkingComponents
+                  - Outputs.SecurityGroupId
+            SubnetId:
+              Fn::GetAtt:
+                - NetworkingComponents
+                - Outputs.PublicSubnet1Id
+        BlockDeviceMappings:
+          - DeviceName: "/dev/sdz"
+            Ebs:
+              DeleteOnTermination: True
+              Encrypted: True
+              VolumeSize: 50
+              VolumeType: "gp3"
+        UserData:
+          Fn::Base64: >
+            sudo yum update –y
+            sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+            sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+            sudo yum upgrade
+            sudo amazon-linux-extras install java-openjdk11 -y
+            sudo yum install jenkins -y
+            sudo systemctl enable jenkins
+            sudo systemctl start jenkins
+            sudo systemctl status jenkins
+
+
+#  Ec2Instance:
+#    Type: AWS::EC2::Instance
+#    Properties:
+#      ImageId: ''
+#      KeyName: !Ref SshKey
+#
