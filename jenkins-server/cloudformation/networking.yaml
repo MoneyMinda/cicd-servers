@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Stack template for creating networking resources for a project.
+
+Mappings:
+  CidrBlockMap:
+    InternetBlockIpv4:
+      "block": "0.0.0.0/0"
+    InternetBlockIpv6:
+      "block": "::/0"
+    VpcBlock:
+      "block": "10.0.0.0/16"
+    PublicSubnetBlock1:
+      "block": "10.0.1.0/20"
+    PrivateSubnetBlock1:
+      "block": "10.0.2.0/20"
+
+Resources:
+  DeJenkinsVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [CidrBlockMap, VpcBlock, block]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: "de-etl-vpc"
+        - Key: project
+          Value: "de-etl-prj-jenkins"
+
+  DeJenkinsInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: "de-etl-igw"
+        - Key: project
+          Value: "de-etl-prj-jenkins"
+
+  DeJenkinsVpcInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: DeJenkinsInternetGateway
+      VpcId:
+        Ref: DeJenkinsVpc
+
+  DeJenkinsPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "us-east-1a"
+      CidrBlock: !FindInMap [CidrBlockMap, PublicSubnetBlock1, block]
+      VpcId: !Ref DeJenkinsVpc
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: "de-etl-subnet-public-1a"
+        - Key: project
+          Value: "de-etl-prj-jenkins"
+
+  DeJenkinsPublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: DeJenkinsVpc
+      Tags:
+        - Key: Name
+          Value: "de-etl-rtb-public-1a"
+        - Key: project
+          Value: "de-etl-prj-jenkins"
+
+  DeJenkinsPublicRouteInternetIpv4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv4, block]
+      GatewayId:
+        Ref: DeJenkinsInternetGateway
+      RouteTableId:
+         Ref: DeJenkinsPublicRouteTable1
+
+  DeJenkinsPublicRouteInternetIpv6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv6, block]
+      GatewayId:
+        Ref: DeJenkinsInternetGateway
+      RouteTableId:
+         Ref: DeJenkinsPublicRouteTable1
+
+  DeJenkinsPublic1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: DeJenkinsPublicRouteTable1
+      SubnetId:
+        Ref: DeJenkinsPublicSubnet1
+
+  DeJenkinsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Jenkins server host
+      GroupName: "de-etl-ec2-sg"
+      VpcId:
+        Ref: DeJenkinsVpc
+      Tags:
+        - Key: Name
+          Value: "de-etl-ec2-sg"
+        - Key: project
+          Value: "de-etl-prj-jenkins"
+
+  DeJenkinsSecurityGroupIngressSubnet:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupName:
+        Ref: DeJenkinsSecurityGroup
+      CidrIp: !FindInMap [CidrBlockMap, PublicSubnetBlock1, block]
+      Description: "public-subnet-1a"
+      FromPort: 0
+      ToPort: 65535
+      IpProtocol: tcp
+
+  DeJenkinsSecurityGroupIngressSelfRef:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: DeJenkinsSecurityGroup
+    Properties:
+      GroupName:
+        Ref: DeJenkinsSecurityGroup
+      SourceSecurityGroupName:
+        Ref: DeJenkinsSecurityGroup
+      Description: "self reference rule"
+      FromPort: 0
+      ToPort: 65535
+      IpProtocol: tcp
+
+  DeJenkinsSecurityGroupEgressIpv4:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupName:
+        Ref: DeJenkinsSecurityGroup
+      CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv4, block ]
+      Description: "All outgoing Ipv4"
+      FromPort: 0
+      ToPort: 65535
+      IpProtocol: tcp
+
+  DeJenkinsSecurityGroupEgressIpv6:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupName:
+        Ref: DeJenkinsSecurityGroup
+      CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
+      Description: "All outgoing Ipv6"
+      FromPort: 0
+      ToPort: 65535
+      IpProtocol: tcp
