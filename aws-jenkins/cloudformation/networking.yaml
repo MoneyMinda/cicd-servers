@@ -23,17 +23,20 @@ Mappings:
 Parameters:
   ProjectNameParam:
     Type: String
-    Description: Enter value for project name tag
+    Description: Project name tag
     Default: "network"
   EnvParam:
     Type: String
-    Description: Enter value for environment tag
+    Description: Environment tag
     Default: "dev"
     AllowedValues:
       - "prod"
       - "dev"
       - "qa"
       - "test"
+  ResourceRandom:
+    Type: String
+    Description: Random string for resources created in this stack
 
 Resources:
   Vpc:
@@ -44,7 +47,7 @@ Resources:
       EnableDnsSupport: true
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-vpc-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-vpc-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -55,7 +58,7 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-igw-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-igw-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -81,7 +84,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-public1-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-public1-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -99,7 +102,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-private1-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-private1-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -117,7 +120,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-public2-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-public2-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -135,7 +138,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-private2-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-private2-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -148,7 +151,7 @@ Resources:
         Ref: Vpc
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-rtb-public-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-rtb-public-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -161,7 +164,7 @@ Resources:
         Ref: Vpc
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-rtb-private-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-rtb-private-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -217,67 +220,29 @@ Resources:
       SubnetId:
         Ref: PrivateSubnet2
 
-  SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Sg for server host
-      GroupName: !Sub "${ProjectNameParam}-ec2-sg-${EnvParam}"
-      VpcId:
-        Ref: Vpc
-      SecurityGroupIngress:
-        CidrIp: !FindInMap [ CidrBlockMap, PublicBlock1, block ]
-        Description: "public1"
-        FromPort: 0
-        ToPort: 65535
-        IpProtocol: tcp
-      SecurityGroupEgress:
-          - CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv4, block ]
-            Description: "All Ipv4"
-            FromPort: 0
-            ToPort: 65535
-            IpProtocol: tcp
-          - CidrIpv6: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
-            Description: "All Ipv6"
-            FromPort: 0
-            ToPort: 65535
-            IpProtocol: tcp
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectNameParam}-ec2-sg-${EnvParam}"
-        - Key: project
-          Value: !Ref ProjectNameParam
-        - Key: env
-          Value: !Ref EnvParam
-
-  SecurityGroupIngressSelfRef:
-    Type: AWS::EC2::SecurityGroupIngress
-    DependsOn: SecurityGroup
-    Properties:
-      GroupId:
-        Ref: SecurityGroup
-      SourceSecurityGroupId:
-        Ref: SecurityGroup
-      Description: "self reference"
-      FromPort: 0
-      ToPort: 65535
-      IpProtocol: tcp
-
 Outputs:
   Vpc:
     Description: Id of the VPC created in this stack
     Value: !Ref Vpc
+    Export:
+      Name: !Sub "${AWS::StackName}-Vpc"
   PublicSubnet1Id:
     Description: Id of the 1st public subnet created in this stack
     Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
   PublicSubnet1Az:
     Description: Az of the 1st public subnet created in this stack
     Value: !GetAtt [PublicSubnet1, AvailabilityZone]
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1Az"
   PrivateSubnet1Id:
     Description: Id of the 1st private subnet created in this stack
     Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1Id"
   PrivateSubnet1Az:
     Description: Az of the 1st private subnet created in this stack
     Value: !GetAtt [PrivateSubnet1, AvailabilityZone]
-  SecurityGroupId:
-    Description: Id of the security group created in this stack
-    Value: !Ref SecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1Az"
