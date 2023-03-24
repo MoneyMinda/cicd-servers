@@ -36,7 +36,7 @@ Parameters:
       - "test"
   ResourceRandom:
     Type: String
-    Description: Random string for resources created in this stack
+    Description: Characters appended to resource name to differentiate stack resources
 
 Resources:
   Vpc:

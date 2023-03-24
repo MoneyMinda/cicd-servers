@@ -19,10 +19,10 @@ Parameters:
       - "test"
   ResourceRandom:
     Type: String
-    Description: Random string for resources created in this stack
+    Description: Characters appended to resource name to differentiate stack resources
   NetworkStackS3PathParam:
     Type: String
-    Description: Enter s3 path of file containing networking stack template
+    Description: S3 path of file containing networking stack template
 
 
 Mappings:

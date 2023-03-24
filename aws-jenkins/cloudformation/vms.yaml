@@ -19,7 +19,7 @@ Parameters:
       - "test"
   ResourceRandom:
     Type: String
-    Description: Random string for resources created in this stack
+    Description: Characters appended to resource name to differentiate stack resources
   NetworkStackName:
     Type: String
     Description: Name of networking stack with exported resources
