@@ -1,4 +1,4 @@
-# AWS Jenkins
+# Jenkins with AWS CloudFormation 
 
 This folder uses AWS CloudFormation and Terraform to build all the resources required to host a Jenkins server (with worker nodes) on the AWS cloud.
 

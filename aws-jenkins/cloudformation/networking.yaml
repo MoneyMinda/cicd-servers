@@ -40,7 +40,7 @@ Parameters:
 
 Resources:
   Vpc:
-    Type: AWS::EC2::VPC
+    Type: "AWS::EC2::VPC"
     Properties:
       CidrBlock: !FindInMap [CidrBlockMap, VpcBlock, block]
       EnableDnsHostnames: true
@@ -54,7 +54,7 @@ Resources:
           Value: !Ref EnvParam
 
   InternetGateway:
-    Type: AWS::EC2::InternetGateway
+    Type: "AWS::EC2::InternetGateway"
     Properties:
       Tags:
         - Key: Name
@@ -65,7 +65,7 @@ Resources:
           Value: !Ref EnvParam
 
   VpcInternetGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
+    Type: "AWS::EC2::VPCGatewayAttachment"
     Properties:
       InternetGatewayId:
         Ref: InternetGateway
@@ -73,7 +73,7 @@ Resources:
         Ref: Vpc
 
   PublicSubnet1:
-    Type: AWS::EC2::Subnet
+    Type: "AWS::EC2::Subnet"
     Properties:
       AvailabilityZone:
         Fn::Select:
@@ -91,7 +91,7 @@ Resources:
           Value: !Ref EnvParam
 
   PrivateSubnet1:
-    Type: AWS::EC2::Subnet
+    Type: "AWS::EC2::Subnet"
     Properties:
       AvailabilityZone:
         Fn::Select:
@@ -109,7 +109,7 @@ Resources:
           Value: !Ref EnvParam
 
   PublicSubnet2:
-    Type: AWS::EC2::Subnet
+    Type: "AWS::EC2::Subnet"
     Properties:
       AvailabilityZone:
         Fn::Select:
@@ -127,7 +127,7 @@ Resources:
           Value: !Ref EnvParam
 
   PrivateSubnet2:
-    Type: AWS::EC2::Subnet
+    Type: "AWS::EC2::Subnet"
     Properties:
       AvailabilityZone:
         Fn::Select:
@@ -145,7 +145,7 @@ Resources:
           Value: !Ref EnvParam
 
   PublicRouteTable1:
-    Type: AWS::EC2::RouteTable
+    Type: "AWS::EC2::RouteTable"
     Properties:
       VpcId:
         Ref: Vpc
@@ -158,7 +158,7 @@ Resources:
           Value: !Ref EnvParam
 
   PrivateRouteTable1:
-    Type: AWS::EC2::RouteTable
+    Type: "AWS::EC2::RouteTable"
     Properties:
       VpcId:
         Ref: Vpc
@@ -171,7 +171,7 @@ Resources:
           Value: !Ref EnvParam
 
   PublicRouteInternetIpv4:
-    Type: AWS::EC2::Route
+    Type: "AWS::EC2::Route"
     Properties:
       DestinationCidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv4, block]
       GatewayId:
@@ -180,7 +180,7 @@ Resources:
          Ref: PublicRouteTable1
 
   PublicRouteInternetIpv6:
-    Type: AWS::EC2::Route
+    Type: "AWS::EC2::Route"
     Properties:
       DestinationIpv6CidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv6, block]
       GatewayId:
@@ -189,7 +189,7 @@ Resources:
          Ref: PublicRouteTable1
 
   Public1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       RouteTableId:
         Ref: PublicRouteTable1
@@ -197,7 +197,7 @@ Resources:
         Ref: PublicSubnet1
 
   Public2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       RouteTableId:
         Ref: PublicRouteTable1
@@ -205,7 +205,7 @@ Resources:
         Ref: PublicSubnet2
 
   Private1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       RouteTableId:
         Ref: PrivateRouteTable1
@@ -213,7 +213,7 @@ Resources:
         Ref: PrivateSubnet1
 
   Private2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       RouteTableId:
         Ref: PrivateRouteTable1
@@ -236,6 +236,16 @@ Outputs:
     Value: !GetAtt [PublicSubnet1, AvailabilityZone]
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnet1Az"
+  PublicSubnet2Id:
+    Description: Id of the 2nd public subnet created in this stack
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet2Id"
+  PublicSubnet2Az:
+    Description: Az of the 2nd public subnet created in this stack
+    Value: !GetAtt [PublicSubnet2, AvailabilityZone]
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet2Az"
   PrivateSubnet1Id:
     Description: Id of the 1st private subnet created in this stack
     Value: !Ref PrivateSubnet1
@@ -246,3 +256,13 @@ Outputs:
     Value: !GetAtt [PrivateSubnet1, AvailabilityZone]
     Export:
       Name: !Sub "${AWS::StackName}-PrivateSubnet1Az"
+  PrivateSubnet2Id:
+    Description: Id of the 2nd private subnet created in this stack
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet2Id"
+  PrivateSubnet2Az:
+    Description: Az of the 2nd private subnet created in this stack
+    Value: !GetAtt [PrivateSubnet2, AvailabilityZone]
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet2Az"
