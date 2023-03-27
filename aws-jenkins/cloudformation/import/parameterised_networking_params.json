@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "ProjectNameParam",
+    "ParameterValue": "<project_name>"
+  },
+  {
+    "ParameterKey": "EnvParam",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "ResourceRandom",
+    "ParameterValue": "<resource_random>"
+  }
+]

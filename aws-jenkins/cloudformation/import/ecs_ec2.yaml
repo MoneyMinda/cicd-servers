@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  Stack template for creating a single virtual machine host
+
+Parameters:
+  ProjectNameParam:
+    Type: String
+    Description: Enter value for project name tag
+    Default: "network"
+  EnvParam:
+    Type: String
+    Description: Enter value for environment tag
+    Default: "dev"
+    AllowedValues:
+      - "prod"
+      - "dev"
+      - "qa"
+      - "test"
+  ResourceRandom:
+    Type: String
+    Description: Characters appended to resource name to differentiate stack resources
+  NetworkStackName:
+    Type: String
+    Description: Name of networking stack with exported resources
+  NetworkStackVpc:
+    Type: String
+    Description: Name of exported Vpc in networking stack
+  NetworkStackPublicSubnet1Id:
+    Type: String
+    Description: Name of exported public subnet 1 id in networking stack
+  NetworkStackPublicSubnet1Az:
+    Type: String
+    Description: Name of exported public subnet 1 az in networking stack
+  NetworkStackPrivateSubnet1Id:
+    Type: String
+    Description: Name of exported private subnet 1 id in networking stack
+  NetworkStackPrivateSubnet1Az:
+    Type: String
+    Description: Name of exported private subnet 1 az in networking stack
+  NetworkStackPublicSubnet2Id:
+    Type: String
+    Description: Name of exported public subnet 2 id in networking stack
+  NetworkStackPublicSubnet2Az:
+    Type: String
+    Description: Name of exported public subnet 2 az in networking stack
+  NetworkStackPrivateSubnet2Id:
+    Type: String
+    Description: Name of exported private subnet 2 id in networking stack
+  NetworkStackPrivateSubnet2Az:
+    Type: String
+    Description: Name of exported private subnet 2 az in networking stack
+  AsgLaunchTemplateId:
+    Type: String
+    Description: Id of exported asg launch template in cluster-addendum stack
+  AsgLaunchTemplateVersion:
+    Type: String
+    Description: Version of exported asg launch template in cluster-addendum stack
+  EncryptionKey:
+    Type: String
+    Description: Id of symmetric encrypt/decrypt key in cluster-addendum stack
+
+Mappings:
+  InstanceTypes:
+    dev:
+      "instanceType": "t3.small"
+    test:
+      "instanceType": "t4g.xlarge"
+    prod:
+      "instanceType": "t4g.2xlarge"
+  CidrBlockMap:
+    InternetBlockIpv4:
+      "block": "0.0.0.0/0"
+    InternetBlockIpv6:
+      "block": "::/0"
+    VpcBlock:
+      "block": "10.0.0.0/16"
+    PublicBlock1:
+      "block": "10.0.0.0/24"
+    PrivateBlock1:
+      "block": "10.0.1.0/24"
+    PublicBlock2:
+      "block": "10.0.2.0/24"
+    PrivateBlock2:
+      "block": "10.0.3.0/24"
+
+Resources:
+  Cluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub "${ProjectNameParam}-ecs-ec2-${ResourceRandom}-${EnvParam}"
+      ClusterSettings:
+        - Name: "containerInsights"
+          Value: "enabled"
+      Configuration:
+         ExecuteCommandConfiguration:
+           KmsKeyId:
+            Fn::ImportValue: !Ref EncryptionKey
+           LogConfiguration:
+             CloudWatchEncryptionEnabled: true
+             CloudWatchLogGroupName: !Sub "${ProjectNameParam}-ecs-${ResourceRandom}-${EnvParam}"
+             S3BucketName: !Sub "${ProjectNameParam}-ecs-${ResourceRandom}-${EnvParam}"
+             S3EncryptionEnabled: true
+             S3KeyPrefix: "logs"
+           Logging: "OVERRIDE"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-ecs-ec2-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  CapacityProvider1: # For main node
+    Type: "AWS::ECS::CapacityProvider"
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn:
+          Fn::Sub:
+          - "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${asg_name}"
+          - asg_name: !Ref AutoScalingGroup1
+        ManagedScaling:
+          InstanceWarmupPeriod: 400
+          MaximumScalingStepSize: 1
+          MinimumScalingStepSize: 1
+          Status: ENABLED
+          TargetCapacity: 2
+        ManagedTerminationProtection: "ENABLED"
+      Name: !Sub "${ProjectNameParam}-cluster-cap-prov1-${ResourceRandom}-${EnvParam}"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-cluster-cap-prov1-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  CapacityProvider2: # For worker nodes
+    Type: "AWS::ECS::CapacityProvider"
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn:
+          Fn::Sub:
+          - "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${asg_name}"
+          - asg_name: !Ref AutoScalingGroup2
+        ManagedScaling:
+          InstanceWarmupPeriod: 400
+          MaximumScalingStepSize: 1
+          MinimumScalingStepSize: 1
+          Status: "ENABLED"
+          TargetCapacity: 5
+        ManagedTerminationProtection: "ENABLED"
+      Name: !Sub "${ProjectNameParam}-cluster-cap-prov2-${ResourceRandom}-${EnvParam}"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-cluster-cap-prov2-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  ClusterCapacityProviderAssociations:
+    Type: "AWS::ECS::ClusterCapacityProviderAssociations"
+    Properties:
+      CapacityProviders:
+        - !Ref CapacityProvider1
+        - !Ref CapacityProvider2
+      Cluster: !Ref Cluster
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: !Ref CapacityProvider1
+          Base: 2
+          Weight: 0
+        - CapacityProvider: !Ref CapacityProvider2
+          Base: 0
+          Weight: 5
+
+  AutoScalingGroup1:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    Properties:
+      AutoScalingGroupName: !Sub "${ProjectNameParam}-asg1-${ResourceRandom}-${EnvParam}"
+      AvailabilityZones:
+        - Fn::ImportValue: !Ref NetworkStackPublicSubnet1Az
+        - Fn::ImportValue: !Ref NetworkStackPublicSubnet2Az
+      CapacityRebalance: true
+      DesiredCapacity: "2"
+      DesiredCapacityType: "units"
+      HealthCheckGracePeriod: 300
+      HealthCheckType: "EC2"
+      LaunchTemplate:
+          LaunchTemplateId:
+            Fn::ImportValue: !Ref AsgLaunchTemplateId
+          Version:
+            Fn::ImportValue: !Ref AsgLaunchTemplateVersion
+      MaxSize: "2"
+      MetricsCollection:
+        - Granularity: "1Minute"
+      MinSize: "1"
+
+  AutoScalingGroup2:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    Properties:
+      AutoScalingGroupName: !Sub "${ProjectNameParam}-asg2-${ResourceRandom}-${EnvParam}"
+      AvailabilityZones:
+        - Fn::ImportValue: !Ref NetworkStackPublicSubnet1Az
+        - Fn::ImportValue: !Ref NetworkStackPublicSubnet2Az
+      CapacityRebalance: true
+      DesiredCapacity: "1"
+      DesiredCapacityType: "units"
+      HealthCheckGracePeriod: 300
+      HealthCheckType: "EC2"
+      LaunchTemplate:
+        LaunchTemplateId:
+          Fn::ImportValue: !Ref AsgLaunchTemplateId
+        Version:
+          Fn::ImportValue: !Ref AsgLaunchTemplateVersion
+      MaxSize: "5"
+      MetricsCollection:
+        - Granularity: "1Minute"
+      MinSize: "1"
+
+#
+#Outputs:
+#  ServerPublicIp:
+#    Description: Public IP of the EC2 instance created
+#    Value: !GetAtt [Ec2Instance, PublicIp]
+#  ServerPublicDns:
+#    Description: Public DNS name of the EC2 instance created
+#    Value: !GetAtt [Ec2Instance, PublicDnsName]

@@ -20,10 +20,36 @@ Parameters:
   ResourceRandom:
     Type: String
     Description: Characters appended to resource name to differentiate stack resources
-  NetworkStackS3PathParam:
+  NetworkStackName:
     Type: String
-    Description: S3 path of file containing networking stack template
-
+    Description: Name of networking stack with exported resources
+  NetworkStackVpc:
+    Type: String
+    Description: Name of exported Vpc in networking stack
+  NetworkStackPublicSubnet1Id:
+    Type: String
+    Description: Name of exported public subnet 1 id in networking stack
+  NetworkStackPublicSubnet1Az:
+    Type: String
+    Description: Name of exported public subnet 1 az in networking stack
+  NetworkStackPrivateSubnet1Id:
+    Type: String
+    Description: Name of exported private subnet 1 id in networking stack
+  NetworkStackPrivateSubnet1Az:
+    Type: String
+    Description: Name of exported private subnet 1 az in networking stack
+  NetworkStackPublicSubnet2Id:
+    Type: String
+    Description: Name of exported public subnet 2 id in networking stack
+  NetworkStackPublicSubnet2Az:
+    Type: String
+    Description: Name of exported public subnet 2 az in networking stack
+  NetworkStackPrivateSubnet2Id:
+    Type: String
+    Description: Name of exported private subnet 2 id in networking stack
+  NetworkStackPrivateSubnet2Az:
+    Type: String
+    Description: Name of exported private subnet 2 az in networking stack
 
 Mappings:
   InstanceTypes:
@@ -50,17 +76,8 @@ Mappings:
       "block": "10.0.3.0/24"
 
 Resources:
-  NetworkingComponents:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub "${NetworkStackS3PathParam}"
-      Parameters:
-        ProjectNameParam: !Ref ProjectNameParam
-        EnvParam: !Ref EnvParam
-        ResourceRandom: !Ref ResourceRandom
-
   SshKey:
-    Type: AWS::EC2::KeyPair
+    Type: "AWS::EC2::KeyPair"
     Properties:
       KeyName: !Sub "${ProjectNameParam}-vm-sshkey-${ResourceRandom}-${EnvParam}"
       Tags:
@@ -71,8 +88,54 @@ Resources:
         - Key: env
           Value: !Ref EnvParam
 
+  EncryptionKey:
+    Type: "AWS::KMS::Key"
+    Properties:
+      Description: !Sub "Symmetric encryption key for server ${ProjectNameParam}"
+      Enabled: true
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: !Sub "${ProjectNameParam}-key-${ResourceRandom}-${EnvParam}"
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt [InstanceRole, Arn]
+            Action:
+              - 'kms:DescribeKey'
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey'
+              - 'kms:GenerateDataKeyWithoutPlaintext'
+            Resource: '*'
+          - Sid: Allow use of the key
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/developer-admin'
+            Action: 'kms:*'
+            Resource: '*'
+      KeySpec: "SYMMETRIC_DEFAULT"
+      KeyUsage: "ENCRYPT_DECRYPT"
+      MultiRegion: false
+      PendingWindowInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-encrypt-key-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
   SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+    Type: "AWS::EC2::SecurityGroup"
     Properties:
       GroupDescription: Sg for server host
       GroupName: !Sub "${ProjectNameParam}-ec2-sg-${ResourceRandom}-${EnvParam}"
@@ -108,7 +171,7 @@ Resources:
           Value: !Ref EnvParam
 
   SecurityGroupIngressSelfRef:
-    Type: AWS::EC2::SecurityGroupIngress
+    Type: "AWS::EC2::SecurityGroupIngress"
     DependsOn: SecurityGroup
     Properties:
       GroupId:
@@ -121,7 +184,7 @@ Resources:
       IpProtocol: tcp
 
   InstanceRole:
-    Type: AWS::IAM::Role
+    Type: "AWS::IAM::Role"
     Properties:
       RoleName: !Sub "${ProjectNameParam}-ec2-role-${ResourceRandom}-${EnvParam}"
       Path: "/developer/"
@@ -145,7 +208,7 @@ Resources:
                 Resource: '*'
 
   InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
+    Type: "AWS::IAM::InstanceProfile"
     DependsOn: InstanceRole
     Properties:
       InstanceProfileName: !Sub "${ProjectNameParam}-ec2-ip-${ResourceRandom}-${EnvParam}"
@@ -153,22 +216,8 @@ Resources:
       Roles:
         - !Ref InstanceRole
 
-  Ec2Instance:
-    Type: AWS::EC2::Instance
-    Properties:
-      LaunchTemplate:
-         LaunchTemplateId: !Ref LaunchTemplate
-         Version: !GetAtt [LaunchTemplate, LatestVersionNumber]
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectNameParam}-ec2-${ResourceRandom}-${EnvParam}"
-        - Key: project
-          Value: !Ref ProjectNameParam
-        - Key: env
-          Value: !Ref EnvParam
-
   LaunchTemplate:
-    Type: AWS::EC2::LaunchTemplate
+    Type: "AWS::EC2::LaunchTemplate"
     Properties:
       LaunchTemplateName: !Sub "${ProjectNameParam}-launch-template-${ResourceRandom}-${EnvParam}"
       LaunchTemplateData:
@@ -182,12 +231,6 @@ Resources:
         PrivateDnsNameOptions:
           EnableResourceNameDnsARecord: true
           HostnameType: "resource-name"
-        Placement:
-          Tenancy: default
-          AvailabilityZone:
-            Fn::GetAtt:
-            - NetworkingComponents
-            - Outputs.PublicSubnet1Az
         NetworkInterfaces:
           - Description: "VM ENI"
             DeleteOnTermination: true
@@ -196,9 +239,7 @@ Resources:
             Groups:
               - !Ref SecurityGroup
             SubnetId:
-              Fn::GetAtt:
-                - NetworkingComponents
-                - Outputs.PublicSubnet1Id
+             Fn::ImportValue: !Sub "${NetworkStackPublicSubnet1Id}"
         BlockDeviceMappings:
           - DeviceName: "/dev/sdz"
             Ebs:
@@ -234,12 +275,18 @@ Resources:
               "systemctl start jenkins"]]
 
 Outputs:
-  ServerPublicIp:
-    Description: Public IP of the EC2 instance created
-    Value: !GetAtt [Ec2Instance, PublicIp]
-  ServerPublicDns:
-    Description: Public DNS name of the EC2 instance created
-    Value: !GetAtt [Ec2Instance, PublicDnsName]
-
-
-
+  AsgLaunchTemplateId:
+    Description: Id of auto-scaling group launch template
+    Value: !Ref LaunchTemplate
+    Export:
+      Name: !Sub "${AWS::StackName}-asg-launch-template-id"
+  AsgLaunchTemplateVersion:
+    Description: Latest version of auto-scaling group launch template
+    Value: !GetAtt [LaunchTemplate, LatestVersionNumber]
+    Export:
+      Name: !Sub "${AWS::StackName}-asg-launch-template-version"
+  EncryptionKey:
+    Description: Id of encryption key
+    Value: !Ref EncryptionKey
+    Export:
+      Name: !Sub "${AWS::StackName}-crypt-sym-key"
