@@ -1,13 +1,16 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: >
-  Stack template for creating a single virtual machine host
+
+Description: Stack template for creating a single virtual machine host
+
+
 
 Parameters:
   ProjectNameParam:
     Type: String
     Description: Enter value for project name tag
     Default: "network"
+
   EnvParam:
     Type: String
     Description: Enter value for environment tag
@@ -17,39 +20,41 @@ Parameters:
       - "dev"
       - "qa"
       - "test"
+
   ResourceRandom:
     Type: String
     Description: Characters appended to resource name to differentiate stack resources
-  NetworkStackName:
+
+  NetworkStackVpcId:
+    Type: "String"
+    Description: Id of exported Vpc in networking stack
+
+  NetworkStackVpcCidrBlockIpv4:
+    Type: "String"
+    Description: Ipv4 Cidr of exported Vpc in networking stack
+
+  NetworkStackPublicSubnetIds:
+    Type: "String"
+    Description: List of exported public subnet ids in networking stack
+
+  NetworkStackPrivateSubnetIds:
+    Type: "String"
+    Description: List of exported private subnet ids in networking stack
+
+  NetworkStackSubnetAzs:
+    Type: "String"
+    Description: List of exported subnet azs in networking stack
+
+  InternetCidrBlockIpv4:
     Type: String
-    Description: Name of networking stack with exported resources
-  NetworkStackVpc:
+    Description: IPv4 CIDR Block for Internet
+    Default: "0.0.0.0/0"
+
+  InternetCidrBlockIpv6:
     Type: String
-    Description: Name of exported Vpc in networking stack
-  NetworkStackPublicSubnet1Id:
-    Type: String
-    Description: Name of exported public subnet 1 id in networking stack
-  NetworkStackPublicSubnet1Az:
-    Type: String
-    Description: Name of exported public subnet 1 az in networking stack
-  NetworkStackPrivateSubnet1Id:
-    Type: String
-    Description: Name of exported private subnet 1 id in networking stack
-  NetworkStackPrivateSubnet1Az:
-    Type: String
-    Description: Name of exported private subnet 1 az in networking stack
-  NetworkStackPublicSubnet2Id:
-    Type: String
-    Description: Name of exported public subnet 2 id in networking stack
-  NetworkStackPublicSubnet2Az:
-    Type: String
-    Description: Name of exported public subnet 2 az in networking stack
-  NetworkStackPrivateSubnet2Id:
-    Type: String
-    Description: Name of exported private subnet 2 id in networking stack
-  NetworkStackPrivateSubnet2Az:
-    Type: String
-    Description: Name of exported private subnet 2 az in networking stack
+    Description: IPv6 CIDR Block for Internet
+    Default: "::/0"
+
 
 Mappings:
   InstanceTypes:
@@ -59,21 +64,7 @@ Mappings:
       "instanceType": "t4g.xlarge"
     prod:
       "instanceType": "t4g.2xlarge"
-  CidrBlockMap:
-    InternetBlockIpv4:
-      "block": "0.0.0.0/0"
-    InternetBlockIpv6:
-      "block": "::/0"
-    VpcBlock:
-      "block": "10.0.0.0/16"
-    PublicBlock1:
-      "block": "10.0.0.0/24"
-    PrivateBlock1:
-      "block": "10.0.1.0/24"
-    PublicBlock2:
-      "block": "10.0.2.0/24"
-    PrivateBlock2:
-      "block": "10.0.3.0/24"
+
 
 Resources:
   SshKey:
@@ -128,60 +119,103 @@ Resources:
       PendingWindowInDays: 7
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-encrypt-key-${ResourceRandom}-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-crypt-sym-key-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
           Value: !Ref EnvParam
 
-  SecurityGroup:
+  PublicSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
-      GroupDescription: Sg for server host
-      GroupName: !Sub "${ProjectNameParam}-ec2-sg-${ResourceRandom}-${EnvParam}"
+      GroupDescription: Sg for public server host
+      GroupName: !Sub "${ProjectNameParam}-pub-sg-${ResourceRandom}-${EnvParam}"
       VpcId:
-        Fn::ImportValue: !Sub "${NetworkStackVpc}"
+        Fn::ImportValue: !Ref NetworkStackVpcId
       SecurityGroupIngress:
-        - CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv4, block ]
+        - CidrIp: !Ref InternetCidrBlockIpv4
           Description: "All Ipv4"
           ToPort: -1
           IpProtocol: "-1"
-        - CidrIpv6: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
+        - CidrIpv6: !Ref InternetCidrBlockIpv6
           Description: "All Ipv6"
           FromPort: -1
           ToPort: -1
           IpProtocol: "-1"
       SecurityGroupEgress:
-          - CidrIp: !FindInMap [ CidrBlockMap, InternetBlockIpv4, block ]
+          - CidrIp: !Ref InternetCidrBlockIpv4
             Description: "All Ipv4"
             FromPort: -1
             ToPort: -1
             IpProtocol: "-1"
-          - CidrIpv6: !FindInMap [ CidrBlockMap, InternetBlockIpv6, block ]
+          - CidrIpv6: !Ref InternetCidrBlockIpv6
             Description: "All Ipv6"
             FromPort: -1
             ToPort: -1
             IpProtocol: "-1"
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-ec2-sg-${ResourceRandom}-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-pub-sg-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
           Value: !Ref EnvParam
 
-  SecurityGroupIngressSelfRef:
+  PublicSecurityGroupIngressSelfRef:
     Type: "AWS::EC2::SecurityGroupIngress"
-    DependsOn: SecurityGroup
     Properties:
-      GroupId:
-        Ref: SecurityGroup
-      SourceSecurityGroupId:
-        Ref: SecurityGroup
+      GroupId: !Ref PublicSecurityGroup
+      SourceSecurityGroupId: !Ref PublicSecurityGroup
       Description: "self reference"
-      FromPort: 0
-      ToPort: 65535
-      IpProtocol: tcp
+      FromPort: -1
+      ToPort: -1
+      IpProtocol: "-1"
+
+  PrivateSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Sg for public server host
+      GroupName: !Sub "${ProjectNameParam}-priv-sg-${ResourceRandom}-${EnvParam}"
+      VpcId:
+        Fn::ImportValue: !Ref NetworkStackVpcId
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref PublicSecurityGroup
+          Description: "Public Subnet"
+          ToPort: -1
+          IpProtocol: "-1"
+        - CidrIp:
+            Fn::ImportValue: !Ref NetworkStackVpcCidrBlockIpv4
+          Description: "Local traffic"
+          ToPort: -1
+          IpProtocol: "-1"
+      SecurityGroupEgress:
+          - CidrIp: !Ref InternetCidrBlockIpv4
+            Description: "All Ipv4"
+            FromPort: -1
+            ToPort: -1
+            IpProtocol: "-1"
+          - CidrIpv6: !Ref InternetCidrBlockIpv6
+            Description: "All Ipv6"
+            FromPort: -1
+            ToPort: -1
+            IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-priv-sg-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  PrivateSecurityGroupIngressSelfRef:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      SourceSecurityGroupId: !Ref PrivateSecurityGroup
+      Description: "self reference"
+      FromPort: -1
+      ToPort: -1
+      IpProtocol: "-1"
 
   InstanceRole:
     Type: "AWS::IAM::Role"
@@ -231,15 +265,6 @@ Resources:
         PrivateDnsNameOptions:
           EnableResourceNameDnsARecord: true
           HostnameType: "resource-name"
-        NetworkInterfaces:
-          - Description: "VM ENI"
-            DeleteOnTermination: true
-            AssociatePublicIpAddress: true
-            DeviceIndex: 0
-            Groups:
-              - !Ref SecurityGroup
-            SubnetId:
-             Fn::ImportValue: !Sub "${NetworkStackPublicSubnet1Id}"
         BlockDeviceMappings:
           - DeviceName: "/dev/sdz"
             Ebs:
@@ -247,6 +272,8 @@ Resources:
               Encrypted: True
               VolumeSize: 50
               VolumeType: "gp3"
+        SecurityGroupIds:
+          - !Ref PrivateSecurityGroup
         UserData:
           Fn::Base64:
             Fn::Join: ["\n\n", [
@@ -273,6 +300,7 @@ Resources:
               "systemctl enable jenkins",
               "echo -e '\n\n\n Starting Jenkins in systemctl'",
               "systemctl start jenkins"]]
+
 
 Outputs:
   AsgLaunchTemplateId:

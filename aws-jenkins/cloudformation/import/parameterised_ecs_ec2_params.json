@@ -12,44 +12,24 @@
     "ParameterValue": "<resource_random>"
   },
   {
-    "ParameterKey": "NetworkStackName",
-    "ParameterValue": "<network_stack_name>"
+    "ParameterKey": "NetworkStackVpcId",
+    "ParameterValue": "<network_stack_name>-VpcId"
   },
   {
-    "ParameterKey": "NetworkStackVpc",
-    "ParameterValue": "<network_stack_name>-Vpc"
+    "ParameterKey": "NetworkStackVpcCidrBlockIpv4",
+    "ParameterValue": "<network_stack_name>-VpcCidrIpv4"
   },
   {
-    "ParameterKey": "NetworkStackPublicSubnet1Id",
-    "ParameterValue": "<network_stack_name>-PublicSubnet1Id"
+    "ParameterKey": "NetworkStackPublicSubnetIds",
+    "ParameterValue": "<network_stack_name>-PublicSubnetIds"
   },
   {
-    "ParameterKey": "NetworkStackPublicSubnet1Az",
-    "ParameterValue": "<network_stack_name>-PublicSubnet1Az"
+    "ParameterKey": "NetworkStackPrivateSubnetIds",
+    "ParameterValue": "<network_stack_name>-PrivateSubnetIds"
   },
   {
-    "ParameterKey": "NetworkStackPrivateSubnet1Id",
-    "ParameterValue": "<network_stack_name>-PrivateSubnet1Id"
-  },
-  {
-    "ParameterKey": "NetworkStackPrivateSubnet1Az",
-    "ParameterValue": "<network_stack_name>-PrivateSubnet1Az"
-  },
-  {
-    "ParameterKey": "NetworkStackPublicSubnet2Id",
-    "ParameterValue": "<network_stack_name>-PublicSubnet2Id"
-  },
-  {
-    "ParameterKey": "NetworkStackPublicSubnet2Az",
-    "ParameterValue": "<network_stack_name>-PublicSubnet2Az"
-  },
-  {
-    "ParameterKey": "NetworkStackPrivateSubnet2Id",
-    "ParameterValue": "<network_stack_name>-PrivateSubnet2Id"
-  },
-  {
-    "ParameterKey": "NetworkStackPrivateSubnet2Az",
-    "ParameterValue": "<network_stack_name>-PrivateSubnet2Az"
+    "ParameterKey": "NetworkStackSubnetAzs",
+    "ParameterValue": "<network_stack_name>-SubnetAzs"
   },
   {
     "ParameterKey": "AsgLaunchTemplateId",

@@ -1,30 +1,15 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: >
-  Stack template for creating networking resources for a project.
 
-Mappings:
-  CidrBlockMap:
-    InternetBlockIpv4:
-      "block": "0.0.0.0/0"
-    InternetBlockIpv6:
-      "block": "::/0"
-    VpcBlock:
-      "block": "10.0.0.0/16"
-    PublicBlock1:
-      "block": "10.0.0.0/24"
-    PrivateBlock1:
-      "block": "10.0.1.0/24"
-    PublicBlock2:
-      "block": "10.0.2.0/24"
-    PrivateBlock2:
-      "block": "10.0.3.0/24"
+Description: Stack template for creating networking resources for a project.
+
 
 Parameters:
   ProjectNameParam:
     Type: String
     Description: Project name tag
     Default: "network"
+
   EnvParam:
     Type: String
     Description: Environment tag
@@ -34,15 +19,32 @@ Parameters:
       - "dev"
       - "qa"
       - "test"
+
   ResourceRandom:
     Type: String
     Description: Characters appended to resource name to differentiate stack resources
+
+  VpcCidrBlock:
+    Type: String
+    Description: CIDR Block for VPC
+    Default: "10.0.0.0/16"
+
+  InternetCidrBlockIpv4:
+    Type: String
+    Description: IPv4 CIDR Block for Internet
+    Default: "0.0.0.0/0"
+
+  InternetCidrBlockIpv6:
+    Type: String
+    Description: IPv6 CIDR Block for Internet
+    Default: "::/0"
+
 
 Resources:
   Vpc:
     Type: "AWS::EC2::VPC"
     Properties:
-      CidrBlock: !FindInMap [CidrBlockMap, VpcBlock, block]
+      CidrBlock: !Ref VpcCidrBlock
       EnableDnsHostnames: true
       EnableDnsSupport: true
       Tags:
@@ -64,6 +66,56 @@ Resources:
         - Key: env
           Value: !Ref EnvParam
 
+  NatGatewayIpAddress1:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-natgw-eip1-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  NatGatewaySubnet1:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt NatGatewayIpAddress1.AllocationId
+      ConnectivityType: "public"
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-natgw1-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  NatGatewayIpAddress2:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-natgw-eip2-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  NatGatewaySubnet2:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt NatGatewayIpAddress2.AllocationId
+      ConnectivityType: "public"
+      SubnetId: !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-natgw2-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
   VpcInternetGatewayAttachment:
     Type: "AWS::EC2::VPCGatewayAttachment"
     Properties:
@@ -79,7 +131,13 @@ Resources:
         Fn::Select:
           - 0
           - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !FindInMap [CidrBlockMap, PublicBlock1, block]
+      CidrBlock:
+        Fn::Select:
+          - 0
+          - Fn::Cidr:
+            - !GetAtt [Vpc, CidrBlock]
+            - 8
+            - 13
       VpcId: !Ref Vpc
       MapPublicIpOnLaunch: true
       Tags:
@@ -97,7 +155,13 @@ Resources:
         Fn::Select:
           - 0
           - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !FindInMap [CidrBlockMap, PrivateBlock1, block]
+      CidrBlock:
+        Fn::Select:
+          - 1
+          - Fn::Cidr:
+            - !GetAtt [Vpc, CidrBlock]
+            - 8
+            - 13
       VpcId: !Ref Vpc
       MapPublicIpOnLaunch: false
       Tags:
@@ -115,7 +179,13 @@ Resources:
         Fn::Select:
           - 1
           - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !FindInMap [CidrBlockMap, PublicBlock2, block]
+      CidrBlock:
+        Fn::Select:
+          - 2
+          - Fn::Cidr:
+            - !GetAtt [Vpc, CidrBlock]
+            - 8
+            - 13
       VpcId: !Ref Vpc
       MapPublicIpOnLaunch: true
       Tags:
@@ -133,7 +203,13 @@ Resources:
         Fn::Select:
           - 1
           - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !FindInMap [CidrBlockMap, PrivateBlock2, block]
+      CidrBlock:
+        Fn::Select:
+          - 3
+          - Fn::Cidr:
+            - !GetAtt [Vpc, CidrBlock]
+            - 8
+            - 13
       VpcId: !Ref Vpc
       MapPublicIpOnLaunch: false
       Tags:
@@ -147,8 +223,7 @@ Resources:
   PublicRouteTable1:
     Type: "AWS::EC2::RouteTable"
     Properties:
-      VpcId:
-        Ref: Vpc
+      VpcId: !Ref Vpc
       Tags:
         - Key: Name
           Value: !Sub "${ProjectNameParam}-rtb-public-${ResourceRandom}-${EnvParam}"
@@ -160,11 +235,22 @@ Resources:
   PrivateRouteTable1:
     Type: "AWS::EC2::RouteTable"
     Properties:
-      VpcId:
-        Ref: Vpc
+      VpcId: !Ref Vpc
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-rtb-private-${ResourceRandom}-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-rtb-private1-${ResourceRandom}-${EnvParam}"
+        - Key: project
+          Value: !Ref ProjectNameParam
+        - Key: env
+          Value: !Ref EnvParam
+
+  PrivateRouteTable2:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectNameParam}-rtb-private2-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
@@ -173,7 +259,7 @@ Resources:
   PublicRouteInternetIpv4:
     Type: "AWS::EC2::Route"
     Properties:
-      DestinationCidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv4, block]
+      DestinationCidrBlock: !Ref InternetCidrBlockIpv4
       GatewayId:
         Ref: InternetGateway
       RouteTableId:
@@ -182,11 +268,25 @@ Resources:
   PublicRouteInternetIpv6:
     Type: "AWS::EC2::Route"
     Properties:
-      DestinationIpv6CidrBlock: !FindInMap [CidrBlockMap, InternetBlockIpv6, block]
+      DestinationIpv6CidrBlock: !Ref InternetCidrBlockIpv6
       GatewayId:
         Ref: InternetGateway
       RouteTableId:
          Ref: PublicRouteTable1
+
+  PrivateRoute1InternetIpv4:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: !Ref InternetCidrBlockIpv4
+      NatGatewayId: !Ref NatGatewaySubnet1
+      RouteTableId: !Ref PrivateRouteTable1
+
+  PrivateRoute2InternetIpv4:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: !Ref InternetCidrBlockIpv4
+      NatGatewayId: !Ref NatGatewaySubnet2
+      RouteTableId: !Ref PrivateRouteTable2
 
   Public1RouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
@@ -216,53 +316,57 @@ Resources:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       RouteTableId:
-        Ref: PrivateRouteTable1
+        Ref: PrivateRouteTable2
       SubnetId:
         Ref: PrivateSubnet2
 
+
 Outputs:
-  Vpc:
+  VpcId:
     Description: Id of the VPC created in this stack
     Value: !Ref Vpc
     Export:
-      Name: !Sub "${AWS::StackName}-Vpc"
-  PublicSubnet1Id:
-    Description: Id of the 1st public subnet created in this stack
-    Value: !Ref PublicSubnet1
+      Name: !Sub "${AWS::StackName}-VpcId"
+
+  VpcCidrIpv4:
+    Description: Ipv4 Cidr of the VPC created in this stack
+    Value: !GetAtt Vpc.CidrBlock
     Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
-  PublicSubnet1Az:
-    Description: Az of the 1st public subnet created in this stack
-    Value: !GetAtt [PublicSubnet1, AvailabilityZone]
+      Name: !Sub "${AWS::StackName}-VpcCidrIpv4"
+
+  SubnetAzs:
+    Description: Azs of the subnets created in this stack
+    Value:
+      Fn::Sub:
+        - "${a},${b}"
+        - a:
+            Fn::Select:
+              - 0
+              - Fn::GetAZs: !Ref AWS::Region
+          b:
+            Fn::Select:
+              - 1
+              - Fn::GetAZs: !Ref AWS::Region
     Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet1Az"
-  PublicSubnet2Id:
-    Description: Id of the 2nd public subnet created in this stack
-    Value: !Ref PublicSubnet2
+      Name: !Sub "${AWS::StackName}-SubnetAzs"
+
+  PublicSubnetIds:
+    Description: Ids of the public subnets created in this stack
+    Value:
+      Fn::Sub:
+        - "${pub_1},${pub_2}"
+        - pub_1: !Ref PublicSubnet1
+          pub_2: !Ref PublicSubnet2
     Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet2Id"
-  PublicSubnet2Az:
-    Description: Az of the 2nd public subnet created in this stack
-    Value: !GetAtt [PublicSubnet2, AvailabilityZone]
+      Name: !Sub "${AWS::StackName}-PublicSubnetIds"
+
+  PrivateSubnetIds:
+    Description: Ids of the private subnets created in this stack
+    Value:
+      Fn::Sub:
+        - "${priv_1},${priv_2}"
+        - priv_1: !Ref PrivateSubnet1
+          priv_2: !Ref PrivateSubnet2
     Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet2Az"
-  PrivateSubnet1Id:
-    Description: Id of the 1st private subnet created in this stack
-    Value: !Ref PrivateSubnet1
-    Export:
-      Name: !Sub "${AWS::StackName}-PrivateSubnet1Id"
-  PrivateSubnet1Az:
-    Description: Az of the 1st private subnet created in this stack
-    Value: !GetAtt [PrivateSubnet1, AvailabilityZone]
-    Export:
-      Name: !Sub "${AWS::StackName}-PrivateSubnet1Az"
-  PrivateSubnet2Id:
-    Description: Id of the 2nd private subnet created in this stack
-    Value: !Ref PrivateSubnet2
-    Export:
-      Name: !Sub "${AWS::StackName}-PrivateSubnet2Id"
-  PrivateSubnet2Az:
-    Description: Az of the 2nd private subnet created in this stack
-    Value: !GetAtt [PrivateSubnet2, AvailabilityZone]
-    Export:
-      Name: !Sub "${AWS::StackName}-PrivateSubnet2Az"
+      Name: !Sub "${AWS::StackName}-PrivateSubnetIds"
+
