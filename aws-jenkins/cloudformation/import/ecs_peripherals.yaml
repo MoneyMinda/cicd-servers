@@ -308,13 +308,27 @@ Outputs:
     Value: !Ref LaunchTemplate
     Export:
       Name: !Sub "${AWS::StackName}-asg-launch-template-id"
+
   AsgLaunchTemplateVersion:
     Description: Latest version of auto-scaling group launch template
     Value: !GetAtt [LaunchTemplate, LatestVersionNumber]
     Export:
       Name: !Sub "${AWS::StackName}-asg-launch-template-version"
+
   EncryptionKey:
     Description: Id of encryption key
     Value: !Ref EncryptionKey
     Export:
       Name: !Sub "${AWS::StackName}-crypt-sym-key"
+
+  PrivateSecurityGroup:
+    Description: Id of private security group created in this template
+    Value: !GetAtt PrivateSecurityGroup.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-priv-sg"
+
+  PublicSecurityGroup:
+    Description: Id of public security group created in this template
+    Value: !GetAtt PublicSecurityGroup.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-pub-sg"

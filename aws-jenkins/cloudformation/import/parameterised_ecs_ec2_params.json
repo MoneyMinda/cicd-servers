@@ -42,5 +42,13 @@
   {
     "ParameterKey": "EncryptionKey",
     "ParameterValue": "<ecs_peripherals_stack_name>-crypt-sym-key"
+  },
+  {
+    "ParameterKey": "PrivateSecurityGroup",
+    "ParameterValue": "<ecs_peripherals_stack_name>-priv-sg"
+  },
+  {
+    "ParameterKey": "PublicSecurityGroup",
+    "ParameterValue": "<ecs_peripherals_stack_name>-pub-sg"
   }
 ]

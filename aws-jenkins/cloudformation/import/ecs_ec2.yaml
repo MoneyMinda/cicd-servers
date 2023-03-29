@@ -67,6 +67,15 @@ Parameters:
     Type: String
     Description: Id of symmetric encrypt/decrypt key in cluster-addendum stack
 
+  PrivateSecurityGroup:
+    Type: "String"
+    Description: Id of private security group created in the peripheral template
+
+  PublicSecurityGroup:
+    Type: "String"
+    Description: Id of public security group created in the peripheral template
+
+
 
 Mappings:
   InstanceTypes:
@@ -120,26 +129,6 @@ Resources:
         - Key: env
           Value: !Ref EnvParam
 
-  MainCapacityProvider: # For main node
-    Type: "AWS::ECS::CapacityProvider"
-    Properties:
-      AutoScalingGroupProvider:
-        AutoScalingGroupArn: !Ref MainAutoScalingGroup
-        ManagedScaling:
-          InstanceWarmupPeriod: 400
-          MaximumScalingStepSize: 1
-          MinimumScalingStepSize: 1
-          Status: ENABLED
-          TargetCapacity: 2
-      Name: !Sub "${ProjectNameParam}-main-cap-prov-${ResourceRandom}-${EnvParam}"
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectNameParam}-main-cap-prov-${ResourceRandom}-${EnvParam}"
-        - Key: project
-          Value: !Ref ProjectNameParam
-        - Key: env
-          Value: !Ref EnvParam
-
   WorkerCapacityProvider: # For worker nodes
     Type: "AWS::ECS::CapacityProvider"
     Properties:
@@ -176,7 +165,7 @@ Resources:
     Properties:
       AutoScalingGroupName: !Sub "${ProjectNameParam}-main-asg-${ResourceRandom}-${EnvParam}"
       CapacityRebalance: true
-      DesiredCapacity: "2"
+      DesiredCapacity: "1"
       DesiredCapacityType: "units"
       HealthCheckGracePeriod: 300
       HealthCheckType: "EC2"
@@ -185,7 +174,7 @@ Resources:
             Fn::ImportValue: !Ref AsgLaunchTemplateId
           Version:
             Fn::ImportValue: !Ref AsgLaunchTemplateVersion
-      MaxSize: "2"
+      MaxSize: "1"
       MetricsCollection:
         - Granularity: "1Minute"
       MinSize: "1"
@@ -281,12 +270,23 @@ Resources:
   BastionHost:
     Type: "AWS::EC2::Instance"
     Properties:
+      PropagateTagsToVolumeOnCreation: true
+      SecurityGroupIds:
+        - Fn::ImportValue: !Ref PublicSecurityGroup
+      SubnetId:
+        Fn::Select:
+          - 0
+          - Fn::Split:
+            - ","
+            - Fn::ImportValue: !Ref NetworkStackPublicSubnetIds
       LaunchTemplate:
-         LaunchTemplateId: !Ref LaunchTemplate
-         Version: !GetAtt [LaunchTemplate, LatestVersionNumber]
+          LaunchTemplateId:
+            Fn::ImportValue: !Ref AsgLaunchTemplateId
+          Version:
+            Fn::ImportValue: !Ref AsgLaunchTemplateVersion
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectNameParam}-ec2-${ResourceRandom}-${EnvParam}"
+          Value: !Sub "${ProjectNameParam}-bastion-vm-${ResourceRandom}-${EnvParam}"
         - Key: project
           Value: !Ref ProjectNameParam
         - Key: env
